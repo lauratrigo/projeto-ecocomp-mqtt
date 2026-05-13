@@ -63,21 +63,31 @@ mqttClient.on("message", async (topic, message) => {
     try {
         const payload = JSON.parse(message.toString());
 
+        console.log("MQTT RECEBIDO:", payload); // 👈 MUITO IMPORTANTE
+
         const {
             deviceId,
             soil,
             airTemp,
-            airHumidity
+            airHumidity,
+            soilExternal,
+            airHumidityExternal,
+            tempExternal
         } = payload;
 
-        await new Reading({
+        const data = new Reading({
             deviceId,
             soil,
             airTemp,
-            airHumidity
-        }).save();
+            airHumidity,
+            soilExternal,
+            airHumidityExternal,
+            tempExternal
+        });
 
-        console.log("📡 dado salvo MQTT:", deviceId);
+        await data.save();
+
+        console.log("📡 salvo no Mongo:", data);
 
     } catch (err) {
         console.error("Erro MQTT:", err);
