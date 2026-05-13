@@ -46,7 +46,12 @@ mongoose.connect(process.env.MONGODB_URI)
 
 const mqtt = require("mqtt");
 
-const mqttClient = mqtt.connect(process.env.MQTT_BROKER_URL);
+// const mqttClient = mqtt.connect(process.env.MQTT_BROKER_URL);
+
+const mqttClient = mqtt.connect(process.env.MQTT_BROKER_URL, {
+    username: process.env.MQTT_USERNAME,
+    password: process.env.MQTT_PASSWORD
+});
 
 mqttClient.on("connect", () => {
     console.log("MQTT conectado");
