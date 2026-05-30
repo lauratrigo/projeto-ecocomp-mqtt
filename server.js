@@ -85,6 +85,26 @@ mqttClient.on("message", async (topic, message) => {
             tempExternal
         } = payload;
 
+       if (!deviceId) {
+            console.log("MQTT sem deviceId");
+            return;
+        }
+
+        if (soil < 0 || soil > 100) {
+            console.log("Umidade do solo inválida");
+            return;
+        }
+
+        if (airHumidity < 0 || airHumidity > 100) {
+            console.log("Umidade do ar inválida");
+            return;
+        }
+
+        if (airTemp < -20 || airTemp > 80) {
+            console.log("Temperatura inválida");
+            return;
+        }
+       
         await new Reading({
             deviceId,
             soil,
@@ -241,6 +261,34 @@ app.post("/api/config", async (req, res) => {
     try {
         const { soloMin, tempMax, tempMin } = req.body;
 
+        // valida umidade do solo
+        if (soloMin < 0 || soloMin > 100) {
+            return res.status(400).json({
+                erro: "soloMin inválido"
+            });
+        }
+
+        // valida temperatura máxima
+        if (tempMax < 0 || tempMax > 60) {
+            return res.status(400).json({
+                erro: "tempMax inválido"
+            });
+        }
+
+        // valida temperatura mínima
+        if (tempMin < 0 || tempMin > 60) {
+            return res.status(400).json({
+                erro: "tempMin inválido"
+            });
+        }
+
+        // garante coerência entre mínima e máxima
+        if (tempMin >= tempMax) {
+            return res.status(400).json({
+                erro: "tempMin deve ser menor que tempMax"
+            });
+        }
+
         let config = await Config.findOne();
         if (!config) config = new Config();
 
@@ -249,9 +297,16 @@ app.post("/api/config", async (req, res) => {
         config.tempMin = tempMin;
 
         await config.save();
-        res.json({ message: "configuração salva", config });
+       
+        res.json({ 
+           message: "configuração salva", 
+           config 
+        });
+       
     } catch (error) {
-        res.status(500).json({ erro: "erro ao salvar config" });
+        res.status(500).json({ 
+           erro: "erro ao salvar config" 
+        });
     }
 });
 
