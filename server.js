@@ -40,17 +40,23 @@ mqttClient.on("message", async (topic, message) => {
             deviceId,
             soil,
             airTemp,
-            airHumidity
+            airHumidity,
+            soilExternal,
+            airHumidityExternal,
+            tempExternal
         } = payload;
 
         await new Reading({
             deviceId,
             soil,
             airTemp,
-            airHumidity
+            airHumidity,
+            soilExternal,
+            airHumidityExternal,
+            tempExternal
         }).save();
 
-        console.log("📡 dado salvo MQTT:", deviceId);
+        console.log("Dado salvo MQTT:", deviceId);
 
     } catch (err) {
         console.error("Erro MQTT:", err);
