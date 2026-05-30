@@ -396,6 +396,16 @@ app.post("/api/register", async (req, res) => {
             return res.status(400).json({ erro: "Estufa inválida" });
         }
 
+       const deviceAlreadyLinked = await User.findOne({
+          devices: deviceId
+      });
+      
+       if (deviceAlreadyLinked) {
+           return res.status(400).json({
+               erro: "Esta estufa já está vinculada a outro usuário"
+           });
+       }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
