@@ -1,36 +1,75 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-// const mqtt = require("mqtt");
+/* =========================================================
+   ECOCOMP BACKEND API
+   ---------------------------------------------------------
+   Backend responsável por:
 
-require("dotenv").config();
+   - Receber dados dos sensores da ESP32 via MQTT
+   - Armazenar leituras no MongoDB
+   - Disponibilizar dados para o frontend
+   - Controlar atuadores da estufa
+   - Gerenciar configurações automáticas
+   - Gerenciar autenticação de usuários
+   ========================================================= */
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+const express = require("express"); // framework principal da api
+const mongoose = require("mongoose"); // odm para comunicação com mongodb
+const cors = require("cors"); // permite acesso da aplicação frontend
 
-const PORT = process.env.PORT || 3000;
+require("dotenv").config(); // carrega variáveis do arquivo .env
 
-/* ================================
-   CONEXÃO COM MONGODB
-================================ */
+const app = express(); // criação da aplicação express
+app.use(cors()); // habilita requisições de outros domínios
+app.use(express.json()); // permite receber json nas requisições
+
+const PORT = process.env.PORT || 3000; // porta do servidor
+
+/* =========================================================
+   CONEXÃO COM BANCO DE DADOS
+   ---------------------------------------------------------
+   Conecta a API ao MongoDB Atlas utilizando a URI
+   armazenada nas variáveis de ambiente
+   ========================================================= */
+
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log("Mongo conectado"))
     .catch(err => console.log("Erro Mongo:", err));
 
-/* ================================
+/* =========================================================
    MQTT
-================================ */
+   ---------------------------------------------------------
+   Responsável pela comunicação em tempo real
+   com as ESP32
+
+   Tópicos utilizados:
+
+   ecocomp/estufa-001/telemetry
+   → sensores para servidor
+
+   ecocomp/estufa-001/actuators
+   → servidor para ESP32
+
+   ecocomp/estufa-001/config
+   → servidor para ESP32
+   ========================================================= */
 
 const mqtt = require("mqtt");
 
-const mqttClient = mqtt.connect(process.env.MQTT_BROKER_URL);
+const mqttClient = mqtt.connect(process.env.MQTT_BROKER_URL); // cria cliente mqtt conectado ao broker
 
+// quando conectado do broker
 mqttClient.on("connect", () => {
     console.log("MQTT conectado");
-
+    // escuta todos os tópicos de telemetria
     mqttClient.subscribe("ecocomp/+/telemetry");
 });
+
+/* =========================================================
+   RECEBIMENTO DE TELEMETRIA
+   ---------------------------------------------------------
+   Toda vez que uma ESP32 publicar dados dos sensores,
+   a mensagem é recebida, convertida para JSON e
+   armazenada no MongoDB
+   ========================================================= */
 
 mqttClient.on("message", async (topic, message) => {
     try {
@@ -63,11 +102,13 @@ mqttClient.on("message", async (topic, message) => {
     }
 });
 
-/* ================================
-   SCHEMAS
-================================ */
+/* =========================================================
+   SCHEMA DE LEITURAS
+   ---------------------------------------------------------
+   Armazena histórico dos sensores internos e externos
+   ========================================================= */
 
-// Leituras dos sensores
+// histórico das leituras dos sensores
 const ReadingSchema = new mongoose.Schema({
     deviceId: String, // id de cada esp de cada estufa
     soil: Number,               // interno
@@ -79,7 +120,11 @@ const ReadingSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-// coleção de estufas
+/* =========================================================
+   SCHEMA DE ESTUFAS
+   ---------------------------------------------------------
+   Representa uma estufa cadastrada no sistema
+   ========================================================= */
 const DeviceSchema = new mongoose.Schema({
     deviceId: String,
     name: String,
@@ -89,7 +134,12 @@ const DeviceSchema = new mongoose.Schema({
 
 const Device = mongoose.model("Device", DeviceSchema, "devices");
 
-// Atuadores
+/* =========================================================
+   SCHEMA DE ATUADORES
+   ---------------------------------------------------------
+   Armazena estado atual dos dispositivos controlados
+   remotamente
+   ========================================================= */
 const ActuatorSchema = new mongoose.Schema({
     bomba: { type: Boolean, default: false },
     ventoinha: { type: Boolean, default: false },
@@ -97,64 +147,46 @@ const ActuatorSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-// Configuração automática
+/* =========================================================
+   SCHEMA DE CONFIGURAÇÃO AUTOMÁTICA
+   ---------------------------------------------------------
+   Define limites para acionamento automático:
+   - Umidade mínima do solo
+   - Temperatura máxima
+   - Temperatura mínima
+   ========================================================= */
 const ConfigSchema = new mongoose.Schema({
     soloMin: Number,
     tempMax: Number,
     tempMin: Number
 });
 
-/* ================================
+/* =========================================================
    MODELS
-================================ */
+   ---------------------------------------------------------
+   Interfaces utilizadas para manipular documentos
+   do MongoDB
+   ========================================================= */
 const Reading = mongoose.model("Reading", ReadingSchema);
 const Actuator = mongoose.model("Actuator", ActuatorSchema);
 const Config = mongoose.model("Config", ConfigSchema);
 
-
-// mqttClient.on("message", async (topic, message) => {
-//     try {
-//         const payload = JSON.parse(message.toString());
-
-//         const {
-//             deviceId,
-//             soil,
-//             airHumidity,
-//             airTemp,
-//             soilExternal,
-//             airHumidityExternal,
-//             tempExternal
-//         } = payload;
-
-//         const data = new Reading({
-//             deviceId,
-//             soil: soil ?? 0,
-//             airHumidity: airHumidity ?? 0,
-//             airTemp: airTemp ?? 0,
-//             soilExternal: soilExternal ?? 0,
-//             airHumidityExternal: airHumidityExternal ?? 0,
-//             tempExternal: tempExternal ?? 0
-//         });
-
-//         await data.save();
-
-//         console.log("📡 Dado salvo via MQTT:", deviceId);
-
-//     } catch (error) {
-//         console.error("Erro ao processar MQTT:", error);
-//     }
-// });
-
-/* ================================
-   ROTAS DE TESTE
-================================ */
+/* =========================================================
+   HEALTH CHECK
+   ---------------------------------------------------------
+   Endpoint utilizado para verificar se a API está
+   online
+   ========================================================= */
 app.get("/health", (req, res) => {
     res.json({ status: "ok" });
 });
 
-/* ================================
-   ROTAS DE ATUADORES
-================================ */
+/* =========================================================
+   ATUALIZAR ATUADORES
+   ---------------------------------------------------------
+   Recebe comando do frontend, salva no MongoDB
+   e publica via MQTT para a ESP32
+   ========================================================= */
 app.post("/api/actuators", async (req, res) => {
     try {
         const { tipo, ativo } = req.body;
@@ -166,7 +198,8 @@ app.post("/api/actuators", async (req, res) => {
         actuators.updatedAt = new Date();
 
         await actuators.save();
-
+        
+       // envia novo estado para a esp32 em tempo real
         mqttClient.publish(
             "ecocomp/estufa-001/actuators",
             JSON.stringify(actuators)
@@ -179,6 +212,12 @@ app.post("/api/actuators", async (req, res) => {
     }
 });
 
+
+/* =========================================================
+   CONSULTAR ATUADORES
+   ---------------------------------------------------------
+   Retorna o estado atual dos atuadores
+   ========================================================= */
 app.get("/api/actuators", async (req, res) => {
     try {
         let actuators = await Actuator.findOne();
@@ -192,9 +231,12 @@ app.get("/api/actuators", async (req, res) => {
     }
 });
 
-/* ================================
-   ROTAS DE CONFIGURAÇÃO
-================================ */
+/* =========================================================
+   SALVAR CONFIGURAÇÃO AUTOMÁTICA
+   ---------------------------------------------------------
+   Atualiza os limites utilizados pela lógica automática
+   da estufa
+   ========================================================= */
 app.post("/api/config", async (req, res) => {
     try {
         const { soloMin, tempMax, tempMin } = req.body;
@@ -213,6 +255,11 @@ app.post("/api/config", async (req, res) => {
     }
 });
 
+/* =========================================================
+   CONSULTAR CONFIGURAÇÃO
+   ---------------------------------------------------------
+   Retorna os parâmetros automáticos atuais
+   ========================================================= */
 app.get("/api/config", async (req, res) => {
     try {
         let config = await Config.findOne();
@@ -226,16 +273,22 @@ app.get("/api/config", async (req, res) => {
     }
 });
 
-/* ================================
-   ROTAS DE SENSORES
-================================ */
-// SALVAR LEITURA (ESP32 envia)
+/* =========================================================
+   RECEBER LEITURAS VIA HTTP
+   ---------------------------------------------------------
+   Mantido para compatibilidade com versões antigas
+   da ESP32
+   ========================================================= */
 app.post("/api/data", async (req, res) => {
     try {
         const {
             deviceId,
-            soil, airHumidity, airTemp,
-            soilExternal, airHumidityExternal, tempExternal
+            soil, 
+            airHumidity, 
+            airTemp,
+            soilExternal, 
+            airHumidityExternal, 
+            tempExternal
         } = req.body;
 
         const data = new Reading({
@@ -255,7 +308,12 @@ app.post("/api/data", async (req, res) => {
     }
 });
 
-// BUSCAR DADOS HISTÓRICOS
+/* =========================================================
+   HISTÓRICO DE LEITURAS
+   ---------------------------------------------------------
+   Retorna as últimas leituras de uma estufa
+   específica para exibição em gráficos
+   ========================================================= */
 app.get("/api/data", async (req, res) => {
     try {
         const { deviceId } = req.query;
@@ -265,19 +323,19 @@ app.get("/api/data", async (req, res) => {
             return res.status(400).json({ erro: "deviceId não informado" });
         }
 
-        const data = await Reading.find({ deviceId }) // 👈 filtra estufa
+        const data = await Reading.find({ deviceId }) 
             .sort({ createdAt: -1 })
             .limit(limit);
 
         const dadosFormatados = data.map(item => ({
             createdAt: item.createdAt,
 
-            // INTERNO
+            // interno
             soil: item.soil ?? 0,
             airHumidity: item.airHumidity ?? 0,
             airTemp: item.airTemp ?? 0,
 
-            // EXTERNO
+            // externo
             soilExternal: item.soilExternal ?? 0,
             airHumidityExternal: item.airHumidityExternal ?? 0,
             tempExternal: item.tempExternal ?? 0
@@ -290,7 +348,7 @@ app.get("/api/data", async (req, res) => {
 });
 
 /* ================================
-   INICIAR SERVIDOR
+   INICIA O SERVIDOR
 ================================ */
 app.listen(PORT, () => {
     console.log("Server rodando na porta", PORT);
@@ -298,16 +356,27 @@ app.listen(PORT, () => {
 
 const bcrypt = require("bcrypt");
 
+/* =========================================================
+   USUÁRIOS
+   ---------------------------------------------------------
+   Armazena credenciais e estufas vinculadas ao usuário
+   ========================================================= */
 const UserSchema = new mongoose.Schema({
     name: String,
     email: { type: String, unique: true },
     password: String,
-    devices: [String], // lista de estufas vinculadas
+    devices: [String], 
     createdAt: { type: Date, default: Date.now }
 });
 
 const User = mongoose.model("User", UserSchema);
 
+/* =========================================================
+   CADASTRO DE USUÁRIO
+   ---------------------------------------------------------
+   Cria novo usuário e vincula uma estufa existente
+   A senha é armazenada utilizando hash bcrypt
+   ========================================================= */
 app.post("/api/register", async (req, res) => {
     try {
         const { name, email, password, deviceId } = req.body;
@@ -350,6 +419,11 @@ app.post("/api/register", async (req, res) => {
     }
 });
 
+/* =========================================================
+   LOGIN
+   ---------------------------------------------------------
+   Valida email e senha do usuário
+   ========================================================= */
 app.post("/api/login", async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -378,12 +452,16 @@ app.get("/ativar", (req, res) => {
         return res.status(400).send("Device inválido");
     }
 
-    // redireciona pro frontend (GitHub Pages ou login/cadastro)
     return res.redirect(
         `https://lauratrigo.github.io/projeto-ecocomp/cadastro.html?device=${deviceId}`
     );
 });
 
+/* =========================================================
+   RESET DE SENHA
+   ---------------------------------------------------------
+   Permite alterar a senha do usuário
+   ========================================================= */
 app.post("/api/reset-password-direct", async (req, res) => {
     try {
         const { email, newPassword } = req.body;
