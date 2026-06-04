@@ -2,9 +2,9 @@
   "name": "ecocomp-api",
   "version": "1.0.0",
   "description": "API para dados do EcoComp",
-  "main": "server.js",
+  "main": "backend/server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node backend/server.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
