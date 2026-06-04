@@ -1,4 +1,5 @@
 const configDAO = require("../dao/configDAO");
+const { getMqttClient } = require("../config/mqtt");
 
 class ConfigService {
     validateConfig({ soloMin, tempMax, tempMin }) {
@@ -38,6 +39,8 @@ class ConfigService {
         config.tempMin = tempMin;
 
         await configDAO.save(config);
+        this.publishConfig(config);
+
         return config;
     }
 
@@ -49,6 +52,21 @@ class ConfigService {
         }
 
         return config;
+    }
+
+    publishConfig(config) {
+        const mqttClient = getMqttClient();
+        if (mqttClient) {
+            mqttClient.publish(
+                "ecocomp/estufa-001/config",
+                JSON.stringify({
+                    soloMin: config.soloMin,
+                    tempMax: config.tempMax,
+                    tempMin: config.tempMin
+                }),
+                { retain: true }
+            );
+        }
     }
 }
 

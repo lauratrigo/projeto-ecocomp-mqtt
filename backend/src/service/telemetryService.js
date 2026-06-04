@@ -1,4 +1,6 @@
 const readingDAO = require("../dao/readingDAO");
+const configService = require("../service/configService");
+const actuatorService = require("../service/actuatorService");
 
 class TelemetryService {
     validateTelemetry(payload) {
@@ -27,6 +29,26 @@ class TelemetryService {
         return true;
     }
 
+    async applyAutomation(payload) {
+        const config = await configService.getConfig();
+        const actuators = await actuatorService.getActuators();
+
+        const desiredStates = {
+            bomba: payload.soil <= config.soloMin,
+            ventoinha: payload.airTemp >= config.tempMax,
+            lampada: payload.airTemp <= config.tempMin
+        };
+
+        // Só atualiza se houver mudança real no estado dos atuadores
+        const stateChanged = Object.keys(desiredStates).some(
+            (key) => actuators[key] !== desiredStates[key]
+        );
+
+        if (stateChanged) {
+            await actuatorService.setActuators(desiredStates);
+        }
+    }
+
     async saveTelemetry(payload) {
         const {
             deviceId,
@@ -49,6 +71,8 @@ class TelemetryService {
         });
 
         console.log("Dado salvo MQTT:", deviceId);
+        await this.applyAutomation(payload);
+
         return reading;
     }
 

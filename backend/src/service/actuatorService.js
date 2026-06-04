@@ -19,16 +19,44 @@ class ActuatorService {
         actuators.updatedAt = new Date();
 
         await actuatorDAO.save(actuators);
+        this.publishActuators(actuators);
 
+        return actuators;
+    }
+
+    async setActuators(newStates) {
+        const actuators = await this.getActuators();
+        let changed = false;
+
+        Object.keys(newStates).forEach((key) => {
+            if (actuators[key] !== undefined && actuators[key] !== newStates[key]) {
+                actuators[key] = newStates[key];
+                changed = true;
+            }
+        });
+
+        if (changed) {
+            actuators.updatedAt = new Date();
+            await actuatorDAO.save(actuators);
+            this.publishActuators(actuators);
+        }
+
+        return actuators;
+    }
+
+    publishActuators(actuators) {
         const mqttClient = getMqttClient();
         if (mqttClient) {
             mqttClient.publish(
                 "ecocomp/estufa-001/actuators",
-                JSON.stringify(actuators)
+                JSON.stringify({
+                    bomba: actuators.bomba,
+                    ventoinha: actuators.ventoinha,
+                    lampada: actuators.lampada
+                }),
+                { retain: true }
             );
         }
-
-        return actuators;
     }
 }
 
