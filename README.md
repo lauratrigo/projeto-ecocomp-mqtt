@@ -333,7 +333,7 @@ Usuários cadastrados na plataforma.
 - Laura Trigo
 - Josiely Toledo
 
-Projeto desenvolvido para a disciplina de **Inteligência Computacional Aplicada ao Monitoramento de Ecossistemas**.
+Projeto desenvolvido para a disciplina de **Projeto de Engenharia da Computação II**.
 
 ---
 
