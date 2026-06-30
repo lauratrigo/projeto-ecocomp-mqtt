@@ -1,4 +1,8 @@
-# 🌱 EcoComp – Inteligência Computacional Aplicada ao Monitoramento de Ecossistemas
+# 🌱 EcoComp - Inteligência Computacional Aplicada ao Monitoramento de Ecossistemas
+
+<p align="center">
+  <img src="Estufa.jpeg" alt="Protótipo da Estufa EcoComp" width="500">
+</p>
 
 O **EcoComp** é um sistema de monitoramento e automação de estufas inteligentes desenvolvido utilizando conceitos de **Internet das Coisas (IoT)**, **Computação em Nuvem**, **Sistemas Embarcados** e **Desenvolvimento Web**.
 
